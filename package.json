@@ -1,6 +1,6 @@
 {
-  "name": "le-challenge-route53",
-  "version": "0.1.2",
+  "name": "@ookla/le-challenge-route53",
+  "version": "0.1.2-1",
   "description": "node-letsencrypt dns challenge compatible with Amazon Route53",
   "main": "index.js",
   "scripts": {
@@ -17,6 +17,8 @@
   "dependencies": {
     "aws-sdk": "^2.6.11",
     "base64-url": "^1.3.2",
+    "numeral": "^2.0.6",
+    "promise-while-loop": "^1.0.1",
     "ramda": "^0.22.1"
   },
   "devDependencies": {

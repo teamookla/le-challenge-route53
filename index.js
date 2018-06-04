@@ -2,17 +2,20 @@
 
 const fs = require('fs');
 const {
+  listResourceRecordSets,
   changeResourceRecordSets,
   getZoneIDByName,
   route53Config,
   route53CreatePayload,
   route53DeletePayload,
+  route53UpsertPayload,
 } = require('./lib/route53');
 
 const {
   encrypt,
   getChallengeDomain,
-  mergeOptions
+  mergeOptions,
+  parseHrtimeToSeconds,
 } = require('./lib/helpers');
 
 const store = require('./lib/store');
@@ -55,18 +58,17 @@ Challenge.set = function (opts, domain, token, keyAuthorization, cb) {
   const keyAuthDigest = encrypt(keyAuthorization);
   const prefixedDomain = getChallengeDomain(opts.acmeChallengeDns, domain);
   return opts.hostedZone.then(id => {
-      const params = route53CreatePayload(id, prefixedDomain, keyAuthDigest);
-      return changeResourceRecordSets(params)
-        .then(() => store.set(domain, {
+    const params = route53UpsertPayload(id, prefixedDomain, keyAuthDigest);
+    return changeResourceRecordSets(params)
+      .then(() => {
+        return store.set(domain, {
           id,
           domain,
           value: keyAuthDigest
-        }));
+        });
+      });
     })
-    .then(() => {
-      setTimeout(cb, opts.delay, null);
-    })
-    .catch(cb);
+    .asCallback(cb);
 };
 
 /* eslint-disable no-unused-vars */
@@ -79,10 +81,9 @@ Challenge.remove = function (opts, domain, token, cb) {
       const prefixedDomain = getChallengeDomain(opts.acmeChallengeDns, domain);
       const params = route53DeletePayload(id, prefixedDomain, value);
       return changeResourceRecordSets(params)
-        .then(() => store.remove(domain));
+        .then(() => {
+          return store.remove(domain)
+        });
     })
-    .then(() => {
-      cb(null);
-    })
-    .catch(cb);
+    .asCallback(cb);
 };
