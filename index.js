@@ -25,7 +25,10 @@ const Challenge = module.exports;
 const defaults = {
   debug: false,
   delay: 2e4,
-  acmeChallengeDns: '_acme-challenge.'
+  acmeChallengeDns: '_acme-challenge.',
+  log(debug, ...args) {
+    if (debug) console.debug.call(console, '[le-challenge-route53]', ...args);
+  },
 };
 
 Challenge.create = function (options) {
