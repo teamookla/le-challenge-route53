@@ -1,26 +1,16 @@
 'use strict';
 
+const _ = require('lodash');
 const fs = require('fs');
-const {
-  listResourceRecordSets,
-  changeResourceRecordSets,
-  getZoneIDByName,
-  route53Config,
-  route53CreatePayload,
-  route53DeletePayload,
-  route53UpsertPayload,
-} = require('./lib/route53');
+const Route53Client = require('@ookla/route53-client').default;
 
 const {
   encrypt,
   getChallengeDomain,
-  mergeOptions,
   parseHrtimeToSeconds,
 } = require('./lib/helpers');
 
 const store = require('./lib/store');
-
-const Challenge = module.exports;
 
 const defaults = {
   debug: false,
@@ -31,62 +21,65 @@ const defaults = {
   },
 };
 
-Challenge.create = function (options) {
-  const zone = options.zone;
-  if(typeof zone !== 'string'){
-    throw new Error('Expected `options.zone` to be of type String');
-  }
-  const opts = mergeOptions(defaults, Object.assign(options, {
+class Challenge {
+  constructor(options) {
+    const zone = options.zone;
+    if (typeof zone !== 'string'){
+      throw new Error('Expected `options.zone` to be of type String');
+    }
+    _.merge(this, defaults, options);
+
+    if (!this.route53) {
+       this.route53 = new Route53Client();
+      // AWS authentication is loaded from config file if its path is provided and
+      // the file exists.
+      if (options.AWSConfigFile && fs.existsSync(options.AWSConfigFile)){
+        route53.getConfig().loadFromPath(options.AWSConfigFile);
+      }
+    }
+
     // TODO: le-challenge-route53 currently supports only one hosted zone,
     // passed as an option. see https://github.com/thadeetrompetter/le-challenge-route53/issues/1
-    hostedZone: getZoneIDByName(zone)
-  }));
-  // AWS authentication is loaded from config file if its path is provided and
-  // the file exists.
-  if(opts.AWSConfigFile && fs.existsSync(opts.AWSConfigFile)){
-    route53Config.loadFromPath(opts.AWSConfigFile);
+    this.hostedZone = this.route53.getZoneIDByName(zone);
   }
 
-  return {
-    getOptions: function () {
-      return Object.assign({}, defaults);
-    },
-    set: Challenge.set,
-    get: Challenge.get,
-    remove: Challenge.remove
-  };
-};
+  getOptions() {
+    return Object.assign({}, defaults);
+  }
 
-Challenge.set = function (opts, domain, token, keyAuthorization, cb) {
-  const keyAuthDigest = encrypt(keyAuthorization);
-  const prefixedDomain = getChallengeDomain(opts.acmeChallengeDns, domain);
-  return opts.hostedZone.then(id => {
-    const params = route53UpsertPayload(id, prefixedDomain, keyAuthDigest);
-    return changeResourceRecordSets(params)
-      .then(() => {
-        return store.set(domain, {
-          id,
-          domain,
-          value: keyAuthDigest
-        });
-      });
-    })
-    .asCallback(cb);
-};
-
-/* eslint-disable no-unused-vars */
-Challenge.get = function (opts, domain, token, cb) { /* Not to be implemented */ };
-/* eslint-enable no-unused-vars */
-
-Challenge.remove = function (opts, domain, token, cb) {
-  store.get(domain)
-    .then(({id, domain, value}) => {
-      const prefixedDomain = getChallengeDomain(opts.acmeChallengeDns, domain);
-      const params = route53DeletePayload(id, prefixedDomain, value);
-      return changeResourceRecordSets(params)
+  set(_opts, domain, token, keyAuthorization, cb) {
+    const keyAuthDigest = encrypt(keyAuthorization);
+    const prefixedDomain = getChallengeDomain(this.acmeChallengeDns, domain);
+    return this.hostedZone.then(id => {
+      const params = this.route53.upsertPayload('TXT', prefixedDomain, `"${keyAuthDigest}"`);
+      return this.route53.changeResourceRecordSets(id, params)
         .then(() => {
-          return store.remove(domain)
+          return store.set(domain, {
+            id,
+            domain,
+            value: keyAuthDigest
+          });
         });
-    })
+      })
     .asCallback(cb);
-};
+  }
+
+  /* eslint-disable no-unused-vars */
+  get(_opts, domain, token, cb) { /* Not to be implemented */ }
+  /* eslint-enable no-unused-vars */
+
+  remove(_opts, domain, token, cb) {
+    store.get(domain)
+      .then(({id, domain, value}) => {
+        const prefixedDomain = getChallengeDomain(this.acmeChallengeDns, domain);
+        const params = this.route53.deletePayload('TXT', prefixedDomain, `"${value}"`);
+        return this.route53.changeResourceRecordSets(id, params)
+          .then(() => {
+            return store.remove(domain)
+          });
+      })
+      .asCallback(cb);
+  }
+}
+
+module.exports = Challenge;
