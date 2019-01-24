@@ -15,7 +15,7 @@
   "author": "Thadee Trompetter",
   "license": "MIT",
   "dependencies": {
-    "@ookla/route53-client": "^1.0.3",
+    "@ookla/route53-client": "^1.0.4",
     "aws-sdk": "^2.6.11",
     "base64-url": "^2.2.0",
     "lodash": "^4.17.10",
