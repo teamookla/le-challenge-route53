@@ -1,6 +1,6 @@
 {
   "name": "@ookla/le-challenge-route53",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "node-letsencrypt dns challenge compatible with Amazon Route53",
   "main": "index.js",
   "scripts": {
